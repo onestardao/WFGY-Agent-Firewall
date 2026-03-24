@@ -122,3 +122,50 @@ Phase 1 is considered successful if these demos are reproducible:
 /docs
   SPEC_PHASE1.md
   ROADMAP.md
+````
+
+## Contribution model
+
+For now, the project uses a simple contribution flow:
+
+1. pick or open an issue
+2. create a branch or fork
+3. keep changes narrow and reviewable
+4. open a PR
+5. maintainer reviews and merges
+
+Please avoid broad refactors during Phase 1.
+The sprint goal is to get the first working firewall gate online.
+
+## Current sprint priority
+
+The current priority order is:
+
+1. wire interception into the execution loop
+2. implement Security Critic
+3. implement terminal review loop
+4. implement audit logging
+5. implement lightweight Alignment Critic
+6. lock the 3 demos
+
+## Future direction
+
+Later phases may add:
+
+* `tool_result_persist` post-execution checks
+* WFGY semantic drift scoring
+* simplified scar memory
+* structured failure tagging
+* richer policy layers
+
+But the first milestone is simpler:
+
+**block first, review second, log everything.**
+
+## Status
+
+Alpha sprint.
+MVP first.
+Keep it small.
+Keep it testable.
+Keep it reviewable.
