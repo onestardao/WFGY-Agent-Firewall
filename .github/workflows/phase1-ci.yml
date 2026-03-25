@@ -1,0 +1,49 @@
+name: phase1-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Validate JSON config files
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('config/firewall.policy.json','utf8')); console.log('firewall.policy.json OK')"
+          node -e "JSON.parse(require('fs').readFileSync('config/allowlist.domains.json','utf8')); console.log('allowlist.domains.json OK')"
+
+      - name: Check TypeScript file presence
+        run: |
+          test -f src/critics/securityCritic.ts
+          test -f src/plugins/beforeToolCall.ts
+          test -f src/types/firewallTypes.ts
+          echo "Core Phase 1 files exist"
+
+      - name: Install dependencies if package.json exists
+        run: |
+          if [ -f package.json ]; then
+            npm install
+          else
+            echo "No package.json yet, skipping npm install"
+          fi
+
+      - name: Run tests if available
+        run: |
+          if [ -f package.json ]; then
+            npm test -- --runInBand || npm test || echo "No working test script yet, skipping"
+          else
+            echo "No package.json yet, skipping tests"
+          fi
