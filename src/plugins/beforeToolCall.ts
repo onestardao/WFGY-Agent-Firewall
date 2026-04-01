@@ -5,6 +5,7 @@ import {
   ToolCallContext,
 } from "../types/firewallTypes";
 import { evaluateSecurity } from "../critics/securityCritic";
+import { evaluateAlignment } from "../critics/alignmentCritic";
 import { requestTerminalReview } from "../hitl/terminalReview";
 import { writeAuditLog } from "../logging/auditLogger";
 
@@ -13,9 +14,9 @@ import { writeAuditLog } from "../logging/auditLogger";
  *
  * Evaluation order:
  *   1. Security Critic  — hard policy checks (DENY / REVIEW / ALLOW)
- *   2. Terminal Review   — if critic returns REVIEW, pause for human (No.4)
- *   3. Audit Logger      — every interception is logged (No.5)
- *   4. Return the FirewallDecision to continue the execution if allowed.
+ *   2. Alignment Critic — task-scope mismatch check (REVIEW / ALLOW)  (No.6)
+ *   3. Terminal Review   — if either critic returns REVIEW, pause for human (No.4)
+ *   4. Audit Logger      — every interception is logged regardless of outcome (No.5)
  *
  * Fail-closed: any unexpected error during evaluation results in DENY.
  */
@@ -33,11 +34,33 @@ export async function beforeToolCall(
   try {
     decision = await evaluateSecurity(context);
   } catch (err: any) {
-    console.error(`[Firewall] CRITICAL ERROR during evaluation: ${err.message}`);
+    console.error(`[Firewall] CRITICAL ERROR during security evaluation: ${err.message}`);
     throw new Error(`[FIREWALL_ERROR] Blocking execution due to failure in enforcement layer.`);
   }
 
-  // ── 2. Enforce ──────────────────────────────────────────────────────────
+  // ── 2. Alignment Critic (only if security passed with ALLOW) ────────────
+  if (decision.decision === Decision.ALLOW) {
+    try {
+      const alignmentResult = await evaluateAlignment(context);
+      if (alignmentResult.decision === Decision.REVIEW) {
+        // Alignment escalated — override to REVIEW
+        decision = alignmentResult;
+      }
+    } catch (err: any) {
+      console.error(`[Firewall] ERROR during alignment evaluation: ${err.message}`);
+      // Fail-closed: treat alignment failure as REVIEW, not silent ALLOW
+      decision = {
+        decision: Decision.REVIEW,
+        category: "ALIGNMENT_ERROR",
+        reason: `Alignment check failed: ${err.message}`,
+        toolName: context.toolName,
+        toolCallId: context.toolCallId ?? `call-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  // ── 3. Enforce ──────────────────────────────────────────────────────────
   switch (decision.decision) {
     case Decision.DENY:
       console.warn(

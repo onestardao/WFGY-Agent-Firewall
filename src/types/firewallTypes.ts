@@ -36,6 +36,8 @@ export interface ToolCallContext {
   sessionId?: string;
   /** Agent identifier for audit trail. */
   agentId?: string;
+  /** Current task description for alignment checking (No.6). */
+  taskScope?: string;
 }
 
 // ── No.4: Human Review ──────────────────────────────────────────────────────
