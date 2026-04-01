@@ -1,5 +1,6 @@
 import { Decision, FirewallDecision, ToolCallContext } from "../types/firewallTypes";
 import { evaluateSecurity } from "../critics/securityCritic";
+import { writeAuditLog } from "../logging/auditLogger";
 
 /**
  * Primary interception hook for the WFGY-Agent-Firewall.
@@ -8,7 +9,8 @@ import { evaluateSecurity } from "../critics/securityCritic";
  *   1. Receive the tool-call context from the agent runtime.
  *   2. Delegate to the Security Critic for evaluation.
  *   3. Enforce the decision (ALLOW / REVIEW / DENY) by blocking bad tool calls via Error exceptions.
- *   4. Return the FirewallDecision to continue the execution if allowed.
+ *   4. Log every interception to the structured audit trail.
+ *   5. Return the FirewallDecision to continue the execution if allowed.
  */
 export async function beforeToolCall(
   context: ToolCallContext
@@ -32,21 +34,24 @@ export async function beforeToolCall(
   switch (decision.decision) {
     case Decision.DENY:
       console.warn(
-        `[Firewall] ✖ DENIED  | category: ${decision.category} | reason: ${decision.reason}`
+        `[Firewall] \u2716 DENIED  | category: ${decision.category} | reason: ${decision.reason}`
       );
+      writeAuditLog(context, decision);
       throw new Error(`[FIREWALL_DENY] ${decision.reason}`);
 
     case Decision.REVIEW:
       console.info(
-        `[Firewall] ⚠ REVIEW | category: ${decision.category} | reason: ${decision.reason}`
+        `[Firewall] \u26A0 REVIEW | category: ${decision.category} | reason: ${decision.reason}`
       );
-      // TEMP: block (since HITL is not implemented yet or is handled out-of-band for #3 MVP)
+      writeAuditLog(context, decision);
+      // TEMP: block (HITL not implemented yet — see No.4)
       throw new Error(`[FIREWALL_REVIEW] ${decision.reason}`);
 
     case Decision.ALLOW:
       console.log(
-        `[Firewall] ✔ ALLOW  | category: ${decision.category} | reason: ${decision.reason}`
+        `[Firewall] \u2714 ALLOW  | category: ${decision.category} | reason: ${decision.reason}`
       );
+      writeAuditLog(context, decision);
       return decision;
   }
 

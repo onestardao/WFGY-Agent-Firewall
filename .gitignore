@@ -1,0 +1,9 @@
+node_modules/
+dist/
+logs/
+package.json
+package-lock.json
+*.js
+*.js.map
+*.d.ts
+!src/**/*.ts
