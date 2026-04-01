@@ -38,6 +38,16 @@ export interface ToolCallContext {
   agentId?: string;
 }
 
+// ── No.4: Human Review ──────────────────────────────────────────────────────
+
+export type HumanReviewOutcome = "APPROVED" | "REJECTED";
+
+export interface HumanReviewResult {
+  outcome: HumanReviewOutcome;
+  reviewerNote?: string;
+  reviewedAt: string; // ISO 8601
+}
+
 // ── No.5: Audit Logging ─────────────────────────────────────────────────────
 
 export interface AuditLogEntry {
@@ -57,10 +67,10 @@ export interface AuditLogEntry {
   reason: string;
 
   // Human review (null if not applicable)
-  humanReview: null;
+  humanReview: HumanReviewResult | null;
 
   // Final outcome after all checks
-  finalOutcome: "EXECUTED" | "BLOCKED";
+  finalOutcome: "EXECUTED" | "BLOCKED" | "BLOCKED_BY_HUMAN";
 
   // Reserved Phase 2 fields
   riskScore?: number;

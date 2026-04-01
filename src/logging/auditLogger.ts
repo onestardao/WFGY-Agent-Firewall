@@ -4,6 +4,7 @@ import {
   AuditLogEntry,
   Decision,
   FirewallDecision,
+  HumanReviewResult,
   ToolCallContext,
 } from "../types/firewallTypes";
 
@@ -42,11 +43,18 @@ function summarizeParams(args: Record<string, any>, maxLen = 200): string {
 }
 
 /**
- * Derive the final outcome label from the firewall decision.
- * (No.4 human review will extend this in a subsequent commit.)
+ * Derive the final outcome label from the firewall decision + human review.
  */
-function deriveFinalOutcome(decision: Decision): AuditLogEntry["finalOutcome"] {
+function deriveFinalOutcome(
+  decision: Decision,
+  humanReview: HumanReviewResult | null
+): AuditLogEntry["finalOutcome"] {
   if (decision === Decision.ALLOW) return "EXECUTED";
+  if (decision === Decision.DENY) return "BLOCKED";
+  // REVIEW path
+  if (humanReview) {
+    return humanReview.outcome === "APPROVED" ? "EXECUTED" : "BLOCKED_BY_HUMAN";
+  }
   return "BLOCKED";
 }
 
@@ -60,7 +68,8 @@ function deriveFinalOutcome(decision: Decision): AuditLogEntry["finalOutcome"] {
  */
 export function writeAuditLog(
   context: ToolCallContext,
-  firewallDecision: FirewallDecision
+  firewallDecision: FirewallDecision,
+  humanReview: HumanReviewResult | null = null
 ): AuditLogEntry {
   const entry: AuditLogEntry = {
     // Identity
@@ -81,18 +90,23 @@ export function writeAuditLog(
     category: firewallDecision.category,
     reason: firewallDecision.reason,
 
-    // Human review — not yet implemented (see No.4)
-    humanReview: null,
+    // Human review
+    humanReview,
 
     // Final outcome
-    finalOutcome: deriveFinalOutcome(firewallDecision.decision),
+    finalOutcome: deriveFinalOutcome(firewallDecision.decision, humanReview),
   };
 
   // ── Persist ─────────────────────────────────────────────────────────────
   const line = JSON.stringify(entry);
 
   // 1. Console (always)
-  const icon = entry.finalOutcome === "EXECUTED" ? "\u2714" : "\u2716";
+  const icon =
+    entry.finalOutcome === "EXECUTED"
+      ? "\u2714"
+      : entry.finalOutcome === "BLOCKED_BY_HUMAN"
+      ? "\u26A0"
+      : "\u2716";
   console.log(`[AuditLog] ${icon} ${entry.toolName} | ${entry.decision} | ${entry.category}`);
 
   // 2. File (append, best-effort — don't crash the firewall if disk fails)
