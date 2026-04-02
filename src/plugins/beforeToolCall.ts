@@ -35,6 +35,16 @@ export async function beforeToolCall(
     decision = await evaluateSecurity(context);
   } catch (err: any) {
     console.error(`[Firewall] CRITICAL ERROR during security evaluation: ${err.message}`);
+    // Record the fail-closed event in audit trail before rethrowing
+    const failClosedDecision: FirewallDecision = {
+      decision: Decision.DENY,
+      category: "ENFORCEMENT_FAILURE",
+      reason: `Security evaluation crashed: ${err.message}`,
+      toolName: context.toolName,
+      toolCallId: context.toolCallId ?? `call-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
+    writeAuditLog(context, failClosedDecision, null);
     throw new Error(`[FIREWALL_ERROR] Blocking execution due to failure in enforcement layer.`);
   }
 

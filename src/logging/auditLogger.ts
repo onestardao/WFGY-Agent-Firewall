@@ -21,10 +21,21 @@ import {
 const LOG_DIR = path.resolve(__dirname, "../../logs");
 const LOG_FILE = path.join(LOG_DIR, "firewall-audit.jsonl");
 
-/** Ensure the log directory exists (created once on module load). */
+/**
+ * Best-effort log directory creation.
+ * If filesystem is read-only or permissions are restricted, degrade
+ * gracefully to console-only logging instead of crashing the firewall.
+ */
+let fileLoggingEnabled = true;
+
 function ensureLogDir(): void {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(LOG_DIR)) {
+      fs.mkdirSync(LOG_DIR, { recursive: true });
+    }
+  } catch (err: any) {
+    console.warn(`[AuditLog] Cannot create log directory (${err.message}). File logging disabled, console-only.`);
+    fileLoggingEnabled = false;
   }
 }
 
@@ -109,11 +120,13 @@ export function writeAuditLog(
       : "\u2716";
   console.log(`[AuditLog] ${icon} ${entry.toolName} | ${entry.decision} | ${entry.category}`);
 
-  // 2. File (append, best-effort — don't crash the firewall if disk fails)
-  try {
-    fs.appendFileSync(LOG_FILE, line + "\n", "utf-8");
-  } catch (err: any) {
-    console.error(`[AuditLog] Failed to write log file: ${err.message}`);
+  // 2. File (append, best-effort — skip if file logging was disabled at init)
+  if (fileLoggingEnabled) {
+    try {
+      fs.appendFileSync(LOG_FILE, line + "\n", "utf-8");
+    } catch (err: any) {
+      console.error(`[AuditLog] Failed to write log file: ${err.message}`);
+    }
   }
 
   return entry;

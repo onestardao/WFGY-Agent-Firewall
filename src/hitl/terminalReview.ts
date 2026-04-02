@@ -56,6 +56,19 @@ export async function requestTerminalReview(
   console.log();
   console.log(border);
 
+  // ── Non-interactive guard ───────────────────────────────────────────────
+  // In headless environments (CI, daemon, no TTY), prompting would block
+  // indefinitely. Fail-closed: auto-reject when no terminal is attached.
+  if (!process.stdin.isTTY) {
+    console.warn("  [No TTY detected] Auto-rejecting (fail-closed).");
+    console.log(border);
+    return {
+      outcome: "REJECTED",
+      reviewerNote: "Auto-rejected: no interactive terminal available.",
+      reviewedAt: new Date().toISOString(),
+    };
+  }
+
   // ── Wait for operator input ─────────────────────────────────────────────
   const answer = await promptUser(
     "  Approve this action? [y/N]: "
